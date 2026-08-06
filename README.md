@@ -1,4 +1,4 @@
-# QRC---Diffusion: the "fair" fusion comparison
+# QRC---Diffusion: the fair fusion comparison
 
 Bias-corrected comparison of a QRC-reservoir-augmented ridge readout against
 plain classical baselines for one-step diffusion denoising, on Fashion-MNIST
