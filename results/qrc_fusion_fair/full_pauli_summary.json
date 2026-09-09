@@ -1,0 +1,18 @@
+{
+ "500": {
+  "classical": 76.858,
+  "interaction": 66.767,
+  "qrc zz (84)": 68.685,
+  "qrc full (612)": 63.252,
+  "random 84": 94.129,
+  "random 612": 96.652
+ },
+ "15000": {
+  "classical": 58.518,
+  "interaction": 65.299,
+  "qrc zz (84)": 61.165,
+  "qrc full (612)": 56.309,
+  "random 84": 70.229,
+  "random 612": 63.376
+ }
+}

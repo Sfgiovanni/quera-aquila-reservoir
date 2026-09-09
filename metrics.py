@@ -91,9 +91,44 @@ def inception_features_and_probs(images: np.ndarray, batch_size: int = 64, devic
 def fmnist_probs(images: np.ndarray, model_path: str, batch_size: int = 256, device: str = "cuda"):
     import torch
     import torch.nn.functional as F
-    from experiments.phase_f import FashionCNN
-    model=FashionCNN().to(device);model.load_state_dict(torch.load(model_path,map_location=device,weights_only=True));model.eval();out=[]
+    model=torch.nn.Sequential(torch.nn.Conv2d(1,32,3,padding=1),torch.nn.ReLU(),torch.nn.MaxPool2d(2),torch.nn.Conv2d(32,64,3,padding=1),torch.nn.ReLU(),torch.nn.MaxPool2d(2),torch.nn.Flatten(),torch.nn.Linear(64*7*7,128),torch.nn.ReLU(),torch.nn.Dropout(0.2),torch.nn.Linear(128,10)).to(device);model.load_state_dict(torch.load(model_path,map_location=device,weights_only=True));model.eval();out=[]
     with torch.inference_mode():
         for start in range(0,len(images),batch_size):
             x=torch.as_tensor(images[start:start+batch_size,None],dtype=torch.float32,device=device);out.append(torch.softmax(model(x),1).cpu().numpy())
     return np.concatenate(out)
+
+
+def kernel_distance(features_a: np.ndarray, features_b: np.ndarray, subset_size: int = 1000,
+                    subsets: int = 100, seed: int = 0) -> tuple[float, float]:
+    """KID: unbiased MMD^2 under the polynomial kernel, Binkowski et al. (2018).
+
+    `k(x, y) = (x . y / d + 1)^3` with `d = 2048`, the unbiased estimator (diagonal dropped from
+    both within-set terms), averaged over `subsets` independent draws of `subset_size` samples from
+    each population. Returns `(mean, sd_across_subsets)`.
+
+    The sd here is a *subset* spread, not a seed spread: it says how tightly the estimator has
+    converged for this one cell, and must never be pooled with the across-seed sd the FID headline
+    uses. Aggregate cells the same way FID is aggregated (mean per seed, then sd across seeds) and
+    keep this column separate.
+
+    Unlike `prdc`, which subsamples both sides to 1000 once, this resamples every subset and uses
+    the full reference population as its pool -- so it sees the same 10k reference FID does.
+    """
+    a = np.asarray(features_a, dtype=np.float64)
+    b = np.asarray(features_b, dtype=np.float64)
+    d = a.shape[1]
+    m = min(subset_size, len(a), len(b))
+    rng = np.random.default_rng(seed)
+    values = []
+    for _ in range(subsets):
+        x = a[rng.choice(len(a), m, replace=False)]
+        y = b[rng.choice(len(b), m, replace=False)]
+        kxx = (x @ x.T / d + 1.) ** 3
+        kyy = (y @ y.T / d + 1.) ** 3
+        kxy = (x @ y.T / d + 1.) ** 3
+        # Unbiased: the diagonal is k(x_i, x_i), which carries no information about the two
+        # distributions and would bias MMD^2 upward by a constant.
+        values.append((kxx.sum() - np.trace(kxx)) / (m * (m - 1))
+                      + (kyy.sum() - np.trace(kyy)) / (m * (m - 1))
+                      - 2. * kxy.mean())
+    return float(np.mean(values)), float(np.std(values))

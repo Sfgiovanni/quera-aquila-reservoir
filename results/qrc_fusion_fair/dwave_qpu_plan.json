@@ -1,0 +1,35 @@
+{
+ "solver": "mock-zephyr",
+ "qubits": 7440,
+ "n_tiles": 148,
+ "chain_len_mean": 2.935810810810811,
+ "chain_len_max": 6,
+ "mock": true,
+ "n_train": 10000,
+ "samples": 10000,
+ "ddim_steps": 50,
+ "reads": 8,
+ "anneal_times_us": [
+  0.005
+ ],
+ "rows": {
+  "fit": 15000,
+  "generation": 500000,
+  "total": 515000
+ },
+ "projection": {
+  "submissions": 3480,
+  "per_submission_us": 18240.04,
+  "qpu_seconds": 63.4753392,
+  "qpu_minutes": 1.05792232
+ },
+ "budget": {
+  "cap_seconds": 1440.0,
+  "usable_seconds": 1296.0,
+  "spent_seconds": 0.0,
+  "remaining_seconds": 1296.0,
+  "submissions": 0
+ },
+ "fits": true,
+ "unreachable_times_us": []
+}

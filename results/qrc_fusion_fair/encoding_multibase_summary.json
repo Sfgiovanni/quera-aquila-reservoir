@@ -1,0 +1,16 @@
+{
+ "500": {
+  "quadrature_fid": 68.685,
+  "multibase_fid": 70.029,
+  "delta": 1.344,
+  "sd": 2.957,
+  "unfavorable": 4
+ },
+ "15000": {
+  "quadrature_fid": 61.165,
+  "multibase_fid": 62.081,
+  "delta": 0.916,
+  "sd": 0.505,
+  "unfavorable": 6
+ }
+}

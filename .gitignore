@@ -1,3 +1,15 @@
 __pycache__/
 *.pyc
 .DS_Store
+.venv/
+.venv-gate1/
+.pytest_cache/
+data/
+cache/
+logs/
+*.orig
+results/**/*.parquet
+results/**/*.npz
+results/**/generation_cells_*/
+results/**/inception_features*/
+results/**/kid_cells/

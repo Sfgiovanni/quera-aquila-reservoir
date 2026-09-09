@@ -1,0 +1,60 @@
+{
+ "n_train": 15000,
+ "seeds": 6,
+ "cells": 102,
+ "fid_null_floor": 6.654,
+ "arms": {
+  "classical": {
+   "fid": 58.518,
+   "sd": 0.788,
+   "val_mse": 0.5455,
+   "frac_at_clip": 0.0003
+  },
+  "qrc": {
+   "fid": 61.165,
+   "sd": 0.763,
+   "val_mse": 0.5145,
+   "frac_at_clip": 0.042
+  },
+  "interaction": {
+   "fid": 65.299,
+   "sd": 1.185,
+   "val_mse": 0.4677,
+   "frac_at_clip": 0.1437
+  },
+  "random 312": {
+   "fid": 65.498,
+   "sd": 1.612,
+   "val_mse": 0.5062,
+   "frac_at_clip": 0.0
+  },
+  "random 84": {
+   "fid": 70.229,
+   "sd": 3.607,
+   "val_mse": 0.5306,
+   "frac_at_clip": 0.0
+  }
+ },
+ "contrasts_vs_classical": {
+  "interaction": {
+   "delta_vs_classical": 6.781,
+   "sd": 0.987,
+   "unfavorable": 6
+  },
+  "qrc": {
+   "delta_vs_classical": 2.647,
+   "sd": 0.732,
+   "unfavorable": 6
+  },
+  "random 312": {
+   "delta_vs_classical": 6.98,
+   "sd": 2.014,
+   "unfavorable": 6
+  },
+  "random 84": {
+   "delta_vs_classical": 11.711,
+   "sd": 3.531,
+   "unfavorable": 6
+  }
+ }
+}

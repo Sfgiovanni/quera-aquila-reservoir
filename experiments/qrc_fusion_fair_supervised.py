@@ -53,7 +53,17 @@ def load_latents(dataset, device):
     return a / sigma, b / sigma, c / sigma, ae, ck, sigma
 
 
-def cell(dataset, seed, draw, n_train, ztr, zv, zt, alpha_bar, device, clamp_train):
+def cell(dataset, seed, draw, n_train, ztr, zv, zt, alpha_bar, device, clamp_train,
+        reservoir='digital'):
+    """`reservoir='rydberg'` swaps the `ridge_qrc` arm's feature map for
+    `quera.features.rydberg_features` -- everything else (readout, controls, splits) is
+    identical. `draw` is meaningless for the Rydberg map (no unitary ensemble, see
+    `docs/AQUILA_PORT.md`), so the whole cell is tagged `unitary_draw=-1`, matching the
+    convention `ridge_classical`/`ridge_interaction` already use for draw-independent arms
+    (`qrc_fusion_fair_generation.py --draw` defaults to -1 for exactly this reason); `draw`
+    is still threaded into `random_map`'s seed below, purely as a PRNG offset for the
+    dimension-matched control, not as a reservoir selector.
+    """
     ds = ROOT + seed
     n_val = max(500, n_train // 2)
     x, y, t, _ = balanced_pairs(ztr, alpha_bar, n_train, ds)
@@ -61,11 +71,19 @@ def cell(dataset, seed, draw, n_train, ztr, zv, zt, alpha_bar, device, clamp_tra
     xt, yt, tt, _ = balanced_pairs(zt, alpha_bar, min(2000, 4 * len(zt)), ds + 200)
     c, cv, ct = plain_design(x, t), plain_design(xv, tv), plain_design(xt, tt)
     raw = lambda xx, e, cc: np.column_stack([xx, e, cc[:, -10:]])
+    unitary_draw = -1 if reservoir == 'rydberg' else draw
+
+    reservoir_kwargs = {}
+    if reservoir == 'rydberg':
+        from quera.encoding import fit_encoding
+        from quera.features import ReservoirParams
+        reservoir_kwargs = dict(reservoir='rydberg',
+                                reservoir_params=ReservoirParams(encoding=fit_encoding(x, t)))
 
     started = perf_counter()
-    q, qv, qt = (qrc_features(x, t, alpha_bar, draw, device, clamp=clamp_train),
-                 qrc_features(xv, tv, alpha_bar, draw, device, clamp=clamp_train),
-                 qrc_features(xt, tt, alpha_bar, draw, device, clamp=clamp_train))
+    q, qv, qt = (qrc_features(x, t, alpha_bar, draw, device, clamp=clamp_train, **reservoir_kwargs),
+                 qrc_features(xv, tv, alpha_bar, draw, device, clamp=clamp_train, **reservoir_kwargs),
+                 qrc_features(xt, tt, alpha_bar, draw, device, clamp=clamp_train, **reservoir_kwargs))
     extract_s = perf_counter() - started
 
     mapper = random_map(c, q.shape[1], ROOT + 50000 + 100 * seed + draw)
@@ -84,9 +102,9 @@ def cell(dataset, seed, draw, n_train, ztr, zv, zt, alpha_bar, device, clamp_tra
     rows = []
     for name, (m, val, lam, pred, nf, floored) in arms.items():
         err = pred - yt
-        rows.append(dict(dataset=dataset, data_seed=seed, unitary_draw=draw, n_train=n_train,
+        rows.append(dict(dataset=dataset, data_seed=seed, unitary_draw=unitary_draw, n_train=n_train,
                          n_val=n_val, n_test=len(yt), clamp_train=clamp_train, method=name,
-                         val_mse=val, test_mse=float(np.mean(err ** 2)),
+                         reservoir=reservoir, val_mse=val, test_mse=float(np.mean(err ** 2)),
                          test_mae=float(np.mean(np.abs(err))), lambda_=lam, n_features=nf,
                          lambda_at_ceiling=bool(lam >= max(LAMBDAS)), n_floored_columns=floored,
                          feature_extraction_s=extract_s if name == 'ridge_qrc' else 0.))
@@ -115,20 +133,27 @@ def run(a):
     tag = 'clamptrain' if a.clamp_train else 'main'
     if a.variance_floor != 1e-6:
         tag += f'_floor{a.variance_floor:g}'
+    if a.reservoir != 'digital':
+        tag += f'_{a.reservoir}'
     path = OUT / f'supervised_{tag}.parquet'
     rows = pd.read_parquet(path).to_dict('records') if path.exists() else []
     done = {(r['dataset'], r['data_seed'], r['unitary_draw'], r['n_train']) for r in rows}
+    # The Rydberg map has no unitary ensemble (see docs/AQUILA_PORT.md), so it needs exactly
+    # one pass per (dataset, seed, n_train), not one per draw -- looping a.draws times would
+    # recompute (mostly cache-hit) the identical cell a.draws times for nothing.
+    draws_iter = (0,) if a.reservoir == 'rydberg' else range(a.draws)
     for dataset in a.datasets:
         ztr, zv, zt, _, ck, sigma = load_latents(dataset, device)
         print(f'{dataset}: train/val/test latents {len(ztr)}/{len(zv)}/{len(zt)} sigma={sigma:.5f}',
               flush=True)
         for n_train in a.n_train:
             for seed in range(a.seeds):
-                for draw in range(a.draws):
-                    if (dataset, seed, draw, n_train) in done:
+                for draw in draws_iter:
+                    tagged_draw = -1 if a.reservoir == 'rydberg' else draw
+                    if (dataset, seed, tagged_draw, n_train) in done:
                         continue
                     new = cell(dataset, seed, draw, n_train, ztr, zv, zt, alpha_bar, device,
-                               a.clamp_train)
+                               a.clamp_train, reservoir=a.reservoir)
                     rows.extend(new)
                     pd.DataFrame(rows).to_parquet(path, index=False)
                     d = {r['method']: r['test_mse'] for r in new}
@@ -167,6 +192,7 @@ def main():
     p.add_argument('--clamp-train', action='store_true')
     p.add_argument('--variance-floor', type=float, default=1e-6,
                    help='attribution ablation only; 1e-10 reproduces the published Standardizer')
+    p.add_argument('--reservoir', choices=('digital', 'rydberg'), default='digital')
     p.add_argument('--device', default='cuda')
     run(p.parse_args())
 
